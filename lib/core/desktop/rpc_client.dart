@@ -154,7 +154,7 @@ final class CoreRpcClient implements CoreRpcChannel {
   void _handleFrameError(Object error, StackTrace stackTrace) {
     commonPrint.log(
       'Transport data stream error: $error',
-      logLevel: LogLevel.error,
+      logLevel: LogLevel.debug,
     );
   }
 

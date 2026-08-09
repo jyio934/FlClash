@@ -261,7 +261,7 @@ class SetupAction extends _$SetupAction {
       await ref.read(coreActionProvider.notifier).restartCore();
     } catch (_) {
       ref.read(authorizedTunEnableProvider.notifier).value =
-          TunAuthorizationState.unauthorized;
+          TunAuthorizationState.none;
     }
   }
 
@@ -349,7 +349,7 @@ class SetupAction extends _$SetupAction {
       return true;
     }
     final authorizationState = ref.read(authorizedTunEnableProvider);
-    if (authorizationState == TunAuthorizationState.authorized) {
+    if (authorizationState != TunAuthorizationState.none) {
       return true;
     }
 

@@ -513,7 +513,33 @@ void main() {
       },
     );
 
-    test('retries admin authorization after a failed attempt', () async {
+    test('reopens authorization when the granted restart fails', () async {
+      late _AuthorizationSetupAction setupAction;
+      final container = ProviderContainer(
+        overrides: [
+          setupActionProvider.overrideWith(() {
+            setupAction = _AuthorizationSetupAction([AuthorizeCode.success]);
+            return setupAction;
+          }),
+          coreActionProvider.overrideWith(_FailingRestartCoreAction.new),
+        ],
+      );
+      addTearDown(container.dispose);
+      container
+          .read(patchClashConfigProvider.notifier)
+          .update((state) => state.copyWith.tun(enable: true));
+      container.read(setupActionProvider);
+      container.read(coreActionProvider);
+
+      await setupAction.updateConfig();
+
+      expect(
+        container.read(authorizedTunEnableProvider),
+        TunAuthorizationState.none,
+      );
+    });
+
+    test('requests admin authorization once per app lifecycle', () async {
       late _AuthorizationSetupAction setupAction;
       final container = ProviderContainer(
         overrides: [
@@ -535,12 +561,33 @@ void main() {
         TunAuthorizationState.unauthorized,
       );
 
-      expect(await setupAction.requestAdmin(true), isFalse);
-      expect(setupAction.authorizationRequestCount, 2);
+      expect(await setupAction.requestAdmin(true), isTrue);
+      expect(setupAction.authorizationRequestCount, 1);
       expect(
         container.read(authorizedTunEnableProvider),
-        TunAuthorizationState.authorized,
+        TunAuthorizationState.unauthorized,
       );
+    });
+
+    test('keeps tun disabled while authorization stays unauthorized', () async {
+      late _AuthorizationSetupAction setupAction;
+      final container = ProviderContainer(
+        overrides: [
+          setupActionProvider.overrideWith(() {
+            setupAction = _AuthorizationSetupAction([AuthorizeCode.error]);
+            return setupAction;
+          }),
+        ],
+      );
+      addTearDown(container.dispose);
+      container
+          .read(patchClashConfigProvider.notifier)
+          .update((state) => state.copyWith.tun(enable: true));
+      container.read(setupActionProvider);
+
+      await setupAction.requestAdmin(true);
+
+      expect(container.read(autoSetSystemDnsStateProvider).a, isFalse);
     });
   });
 }
@@ -626,6 +673,13 @@ class _RestartRecordingCoreAction extends CoreAction {
   @override
   Future<void> restartCore() async {
     restartCount++;
+  }
+}
+
+class _FailingRestartCoreAction extends CoreAction {
+  @override
+  Future<void> restartCore() async {
+    throw Exception('restart failed');
   }
 }
 
